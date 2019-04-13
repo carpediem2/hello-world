@@ -1,32 +1,36 @@
-<%@ page language="java" contentType="text/html; charset=utf-8"
+<%@ page language="java" import="java.util.*" contentType="text/html; charset=utf-8"
     pageEncoding="utf-8"%>
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!DOCTYPE html>
 <html>
 <head>
-<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
-<title>登录界面</title>
+<meta charset="utf-8">
+<title>南京市图书馆用户登录界面</title>
 </head>
-<body background="G:\图片手机\寒衫\IMG_20180926_155109.jpg">
-   <center>
-     <br><br><br><br><br>
-     <h1 style="color:yellow">Login</h1>
-     <br>
-     <form name="loginForm" action="login_check.jsp" method="post">
-         <table Border="0">
-           <tr>
-             <td>账号</td>
-             <td><input type="text" name="username"></td>
-           </tr>
-           <td>密码</td>
-           <td><input type="password" name="password"></td>
-           </tr>
-         </table>
-           <br>
-            <input type="submit" value="登录" style="color:gray;">
-     </form>
-   </center>
-
-</body>
+<body>
+     <center>
+        <form action="logincheck.jsp">
+        <table>
+          <caption>用户登录</caption>
+          <tr>
+             <td>用户名：</td>
+             <td>
+                <input type="text" name="username" size="20">
+             </td>
+             </tr>
+          <tr>
+             <td>密码：</td>
+             <td>
+                <input type="text" name="pwd" size="20">
+             </td>
+          </tr>
+          <tr>
+             <td>
+                <input type="submit" value="登录" />
+             <td>
+                <input type="reset" value="重置" />
+        </table>
+        </form>
+          如果你还未注册，请单击<a href="register.jsp">这里</a>注册！
+     </body>
+  </center>
 </html>
-
-//第一行除问题，重新导入tomcat包还是不行，待解决
