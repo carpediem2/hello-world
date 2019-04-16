@@ -13,3 +13,4 @@ ssm框架-->斗鱼上有.
 src-->classI(建类)
 type="submit" 整个页面的提交 Ajax不能用submit，只能用button。不然整个页面会被销毁/
 右键。source。。 genrate getters and setters---》
+Spring struts mybaties,
