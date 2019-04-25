@@ -1,1 +1,388 @@
 除了数据库做法还有的文件流输入分析操作如何实现（keyerror：空值现象的数据清理。）
+
+
+-------------------------------------------------------------------------------------------------------------------------------
+Apriori
+
+一．代码实现（类似书上的例子）
+from numpy import *
+def dataset():
+    return [[1,3,4],[2,3,5],[1,2,3,5],[2,5]]
+dataset=dataset()
+def createC1(dataset):
+    sub=[]
+    for line in dataset:
+        for i in line:
+            if [i] not in sub:
+                sub.append([i])
+    sub.sort()
+    return map(frozenset,sub)
+ 
+def scanD(D,C1,minsupport=0.7):
+    ssdict={}
+    L=[]
+    supportData={}
+    for tid in D:
+        for i in C1:
+            if i.issubset(tid):
+                if i not in ssdict:
+                    ssdict[i] = 1
+                else:
+                    ssdict[i] += 1
+    num=float(len(D))
+    for key in ssdict:
+        support=ssdict[key]/num
+        if support >= minsupport:
+            L.insert(0,key)
+            supportData[key] = support
+    return L,supportData
+ 
+def apriorizuhe(lk,k):
+    lenlk=len(lk)
+    readlist=[]
+    for i in range(lenlk):
+        for j in range(i+1,lenlk):
+            L1=list(lk[i])[:k-2];L2=list(lk[j])[:k-2]
+            if L1 == L2:
+                readlist.append(lk[i]|lk[j])
+    return readlist
+ 
+def main(dataset,minsupport=0.7):
+    D=map(set,dataset)
+    C1=createC1(dataset)
+    L,supportData=scanD(D,C1,minsupport)
+    L=[L]
+    k=2
+    while(len(L[k-2])>0):
+        ck=apriorizuhe(L[k-2],k)
+        L1,supportdata=scanD(D,ck,minsupport)
+        L.append(L1)
+        supportData.update(supportdata)
+        k += 1
+    return L,supportData
+def generateRules(L,supportData,minconf=0.7):  #minconf为可信度
+    bigrulelist=[]   #新建列表用于储存关联信息
+    for i in range(1,len(L)):   #从第二个开始遍历每一个由频繁项集组成的列表
+        for freqset in L[i]:   #从列表里遍历每一个频繁项集
+            H1=[frozenset([item]) for item in freqset]   
+#对频繁项集里的每个项提出来化为frozenset的形式储存在列表中，如[frozenset([1]),frozenset([2])]
+
+            print 'H1:',H1
+            if (i > 1):   
+#因为第二行的频繁项集里的项都只有2个，所以选择大于二行的进行迭代求解，第一行只有一个直接忽略
+                H1=clacconf(freqset,H1,supportData,bigrulelist,minconf)   
+#先算第二层匹配
+                rulesfromconseq(freqset,H1,supportData,bigrulelist,minconf)              
+            else:
+                clacconf(freqset,H1,supportData,bigrulelist,minconf)  
+ #直接求每个频繁项作为后项的可信度，并保留可信度符合要求的项
+    return bigrulelist
+ 
+def clacconf(freqset,H,supportData,bigrulelist,minconf):   
+#输入频繁项集如frozenset([0,1])，H值作为后项，形式如[frozenset([0]),frozenset([1])]
+    returnlist=[]
+    for conseq in H:   #对频繁项集里的每个项都假设是后项，计算该可信度
+        a=supportData[freqset]/supportData[freqset-conseq]
+        if a >= minconf:   #若该可信度符合要求，则输出该后项
+            print freqset-conseq,'-->',conseq, 'conf:',a
+            bigrulelist.append((freqset-conseq,conseq,a))
+            returnlist.append(conseq)
+    return returnlist
+    
+def rulesfromconseq(freqset,H,supportData,bigrulelist,minconf):   
+#当频繁项集的内容大于1时，如frozenset([0,1,2,3]),其H值为[frozenset([0]),frozenset([1]),...frozenset([3])]
+    if len(H) == 0:   #如果上一层没有匹配上则H为空集
+        pass
+    else:
+        m=len(H[0])   #计算H值的第一个值的长度
+        if (len(freqset) > (m+1)):   #若freqset的长度大于m+1的长度，则继续迭代
+            hmp=apriorigen(H,m+1)   #将单类别加类别，如{0,1,2}转化为{0,1},{1,2}等
+            print 'hmp:',hmp
+            hmp=clacconf(freqset,hmp,supportData,bigrulelist,minconf)   
+#计算可信度
+            if (len(hmp) > 1):   #如果后项的数量大于1，则还有合并的可能，继续递归
+              rulesfromconseq(freqset,hmp,supportData,bigrulelist,minconf)
+
+
+-------------------------------------------------------------------------------------------------------------------对文件数据的操作（在excel文件转化为csv文件格式）
+Series：一种一维数组，和 NumPy 里的数组很相似。事实上，Series 基本上就是基于 NumPy 的数组对象来的。和 NumPy 的数组不同，Series 能为数据自定义标签，也就是索引（index），然后通过索引来访问数组中的数据。
+
+DataFrame：二维的表格型数据结构。很多功能与R中的data.frame类似。可以将DataFrame理解为Series的容器。
+
+Panel ：三维的数组，可以理解为DataFrame的容器。
+
+#-*- coding: utf-8 -*-
+from __future__ import print_function
+import pandas as pd
+ 
+d = pd.read_csv('./第1天.csv',header=None, dtype = object)
+ 
+print(u'\n转换原始数据至0-1矩阵...')
+import time
+start = time.clock()
+ct = lambda x : pd.Series(1, index = x)
+b = map(ct, d.values)
+d = pd.DataFrame(list(b)).fillna(0)
+d = (d==1)
+end = time.clock()
+print(u'\n转换完毕，用时：%0.2f秒' %(end-start))
+print(u'\n开始搜索关联规则...')
+del b
+ 
+support = 0.06 #最小支持度
+confidence = 0.75 #最小置信度
+ms = '--' #连接符，用来区分不同元素，如A--B。需要保证原始表格中不含有该字符
+ 
+#自定义连接函数，用于实现L_{k-1}到C_k的连接
+def connect_string(x, ms):
+    x = list(map(lambda i:sorted(i.split(ms)), x))
+    l = len(x[0])
+    r = []
+    for i in range(len(x)):
+        for j in range(i,len(x)):
+            if x[i][:l-1] == x[j][:l-1] and x[i][l-1] != x[j][l-1]:
+                r.append(x[i][:l-1]+sorted([x[j][l-1],x[i][l-1]]))
+    return r
+ 
+#寻找关联规则的函数
+def find_rule(d, support, confidence):
+    import time
+    start = time.clock()
+    result = pd.DataFrame(index=['support', 'confidence']) #定义输出结果
+ 
+    support_series = 1.0*d.sum()/len(d) #支持度序列
+    column = list(support_series[support_series > support].index) #初步根据支持度筛选
+    k = 0
+ 
+    while len(column) > 1:
+        k = k+1
+        print(u'\n正在进行第%s次搜索...' %k)
+        column = connect_string(column, ms)
+        print(u'数目：%s...' %len(column))
+        sf = lambda i: d[i].prod(axis=1, numeric_only = True) #新一批支持度的计算函数
+ 
+        #创建连接数据，这一步耗时、耗内存最严重。当数据集较大时，可以考虑并行运算优化。
+        d_2 = pd.DataFrame(list(map(sf,column)), index = [ms.join(i) for i in column]).T
+ 
+        support_series_2 = 1.0*d_2[[ms.join(i) for i in column]].sum()/len(d) #计算连接后的支持度
+        column = list(support_series_2[support_series_2 > support].index) #新一轮支持度筛选
+        support_series = support_series.append(support_series_2)
+        column2 = []
+        
+        for i in column: #遍历可能的推理，如{A,B,C}究竟是A+B-->C还是B+C-->A还是C+A-->B？
+            i = i.split(ms)
+            for j in range(len(i)):
+                column2.append(i[:j]+i[j+1:]+i[j:j+1])
+        
+        cofidence_series = pd.Series(index=[ms.join(i) for i in column2]) #定义置信度序列
+        
+        for i in column2: #计算置信度序列
+            cofidence_series[ms.join(i)] = support_series[ms.join(sorted(i))]/support_series[ms.join(i[:len(i)-1])]
+        
+        for i in cofidence_series[cofidence_series > confidence].index: #置信度筛选
+            result[i] = 0.0
+            result[i]['confidence'] = cofidence_series[i]
+            result[i]['support'] = support_series[ms.join(sorted(i.split(ms)))]
+ 
+    result = result.T.sort_values(['confidence','support'], ascending = False) #结果整理，输出
+    end = time.clock()
+    print(u'\n搜索完成，用时：%0.2f秒' %(end-start))
+    print(u'\n结果为：')
+    print(result)
+    
+    return result
+ 
+find_rule(d, support, confidence).to_csv('./opt/out.csv')
+
+
+对文件中挑选特定的列和词进行分析，参考代码如下：
+import numpy as np 
+import pandas as pd
+ 
+datafile='.\第1天.csv'
+outfile='.\output.csv'
+df = pd.DataFrame(pd.read_csv(datafile,encoding="utf_8"))#导入文件
+print(df.shape)#输入维度
+print(df.head())#输出默认前10行
+df.pop('时间')#删除列
+print(df[地点'])#输出列
+df[地点'].replace('科技','科学',inplace = True)#列替换
+df.to_csv(outfile,encoding="utf_8")#输出文件
+
+
+
+FP树
+先定义一个类实现树结构fpGroeth.py
+
+class treeNode:
+    def __init__(self, nameValue, numOccur, parentNode):
+        self.name = nameValue
+        self.count = numOccur
+        self.nodeLink = None
+        self.parent = parentNode
+        self.children = {}
+ 
+    def inc(self, numOccur):
+        self.count += numOccur
+ 
+    def disp(self, ind=1):
+        print ' ' * ind, self.name, ' ', self.count
+        for child in self.children.values():
+            child.disp(ind + 1)
+
+Main函数
+def createTree(dataSet, minSup=1):
+    ''' 创建FP树 '''
+    # 第一次遍历数据集，创建头指针表
+    headerTable = {}
+    for trans in dataSet:
+        for item in trans:
+            headerTable[item] = headerTable.get(item, 0) + dataSet[trans]
+    # 移除不满足最小支持度的元素项
+    for k in headerTable.keys():
+        if headerTable[k] < minSup:
+            del(headerTable[k])
+    # 空元素集，返回空
+    freqItemSet = set(headerTable.keys())
+    if len(freqItemSet) == 0:
+        return None, None
+    # 增加一个数据项，用于存放指向相似元素项指针
+    for k in headerTable:
+        headerTable[k] = [headerTable[k], None]
+    retTree = treeNode('Null Set', 1, None) # 根节点
+    # 第二次遍历数据集，创建FP树
+    for tranSet, count in dataSet.items():
+        localD = {} # 对一个项集tranSet，记录其中每个元素项的全局频率，用于排序
+        for item in tranSet:
+            if item in freqItemSet:
+                localD[item] = headerTable[item][0] # 注意这个[0]，因为之前加过一个数据项
+        if len(localD) > 0:
+            orderedItems = [v[0] for v in sorted(localD.items(), key=lambda p: p[1], reverse=True)] # 排序
+            updateTree(orderedItems, retTree, headerTable, count) # 更新FP树
+    return retTree, headerTable
+
+
+辅助函数：updateTree
+def updateTree(items, inTree, headerTable, count):
+    if items[0] in inTree.children:
+        # 有该元素项时计数值+1
+        inTree.children[items[0]].inc(count)
+    else:
+        # 没有这个元素项时创建一个新节点
+        inTree.children[items[0]] = treeNode(items[0], count, inTree)
+        # 更新头指针表或前一个相似元素项节点的指针指向新节点
+        if headerTable[items[0]][1] == None:
+            headerTable[items[0]][1] = inTree.children[items[0]]
+        else:
+            updateHeader(headerTable[items[0]][1], inTree.children[items[0]])
+ 
+    if len(items) > 1:
+        # 对剩下的元素项迭代调用updateTree函数
+        updateTree(items[1::], inTree.children[items[0]], headerTable, count)
+
+辅助函数：updateHeader（获取头指针表中该元素项对应的单链表的尾节点，然后将其指向新节点targetNode。）
+def updateHeader(nodeToTest, targetNode):
+    while (nodeToTest.nodeLink != None):
+        nodeToTest = nodeToTest.nodeLink
+    nodeToTest.nodeLink = targetNode
+
+生成数据集：（简单例子，文件读取参考上面apriori）
+def loadSimpDat():
+    simpDat = [['r', 'z', 'h', 'j', 'p'],
+               ['z', 'y', 'x', 'w', 'v', 'u', 't', 's'],
+               ['z'],
+               ['r', 'x', 'n', 'o', 's'],
+               ['y', 'r', 'x', 'z', 'q', 't', 'p'],
+               ['y', 'z', 'x', 'e', 'q', 's', 't', 'm']]
+    return simpDat
+ 
+def createInitSet(dataSet):
+    retDict = {}
+    for trans in dataSet:
+        retDict[frozenset(trans)] = 1
+    return retDict
+
+name：节点元素名称，在构造时初始化为给定值
+count：出现次数，在构造时初始化为给定值
+nodeLink：指向下一个相似节点的指针，默认为None
+parent：指向父节点的指针，在构造时初始化为给定值
+children：指向子节点的字典，以子节点的元素名称为键，指向子节点的指针为值，初始化为空字典
+
+inc()：增加节点的出现次数值
+disp()：输出节点和子节点的FP树结构
+
+参数中的dataSet的格式比较奇特，不是直觉上得集合的list，而是一个集合的字典，以这个集合为键，值部分记录的是这个集合出现的次数。于是要生成这个dataSet还需要后面的createInitSet()函数辅助。因此代码中第7行中的dataSet[trans]实际获得了这个trans集合的出现次数（在本例中均为1），同样第21行的“for tranSet, count in dataSet.items():”获得了tranSet和count分别表示一个项集和该项集的出现次数。——这样做是为了适应后面在挖掘频繁项集时生成的条件FP树。
+
+
+
+从FP树中抽取频繁项集的三个基本步骤如下：
+1.从FP树中获得条件模式基；
+2.利用条件模式基，构建一个条件FP树；
+3.迭代重复步骤1步骤2，直到树包含一个元素项为止。
+条件树
+挖掘频繁项集：
+创建前缀路径：主函数：findPrefixPath
+def findPrefixPath(basePat, treeNode):
+    ''' 创建前缀路径 '''
+    condPats = {}
+    while treeNode != None:
+        prefixPath = []
+        ascendTree(treeNode, prefixPath)
+        if len(prefixPath) > 1:
+            condPats[frozenset(prefixPath[1:])] = treeNode.count
+        treeNode = treeNode.nodeLink
+    return condPats
+用于为给定元素项生成一个条件模式基（前缀路径），这通过访问树中所有包含给定元素项的节点来完成。参数basePet表示输入的频繁项，treeNode为当前FP树种对应的第一个节点（可在函数外部通过headerTable[basePat][1]获取）。函数返回值即为条件模式基condPats，用一个字典表示，键为前缀路径，值为计数值。
+ 
+
+辅助函数：ascendTree
+def ascendTree(leafNode, prefixPath):
+    if leafNode.parent != None:
+        prefixPath.append(leafNode.name)
+        ascendTree(leafNode.parent, prefixPath)
+直接修改prefixPath的值，将当前节点leafNode添加到prefixPath的末尾，然后递归添加其父节点。最终结果，prefixPath就是一条从treeNode（包括treeNode）到根节点（不包括根节点）的路径。在主函数findPrefixPath()中再取prefixPath[1:]，即为treeNode的前缀路径。
+
+递归查找频繁项集：
+递归的过程是这样的：
+输入：我们有当前数据集的FP树（inTree，headerTable）
+1. 初始化一个空列表preFix表示前缀
+2. 初始化一个空列表freqItemList接收生成的频繁项集（作为输出）
+3. 对headerTable中的每个元素basePat（按计数值由小到大），递归：
+    3.1 记basePat + preFix为当前频繁项集newFreqSet
+     3.2 将newFreqSet添加到freqItemList中
+    3.3 计算t的条件FP树（myCondTree、myHead）
+    3.4 当条件FP树不为空时，继续下一步；否则退出递归
+    3.4 以myCondTree、myHead为新的输入，以newFreqSet为新的preFix，外加freqItemList，递归这个过程
+
+def mineTree(inTree, headerTable, minSup, preFix, freqItemList):
+    bigL = [v[0] for v in sorted(headerTable.items(), key=lambda p: p[1])]
+    for basePat in bigL:
+        newFreqSet = preFix.copy()
+        newFreqSet.add(basePat)
+        freqItemList.append(newFreqSet)
+        condPattBases = findPrefixPath(basePat, headerTable[basePat][1])
+        myCondTree, myHead = createTree(condPattBases, minSup)
+ 
+        if myHead != None:
+            # 用于测试
+            print 'conditional tree for:', newFreqSet
+            myCondTree.disp()
+ 
+            mineTree(myCondTree, myHead, minSup, newFreqSet, freqItemList)
+inTree和headerTable是由createTree()函数生成的数据集的FP树
+minSup表示最小支持度
+preFix请传入一个空集合（set([])），将在函数中用于保存当前前缀
+freqItemList请传入一个空列表（[]），将用来储存生成的频繁项集
+
+
+封装：
+def fpGrowth(dataSet, minSup=3):
+    initSet = createInitSet(dataSet)
+    myFPtree, myHeaderTab = createTree(initSet, minSup)
+    freqItems = []
+    mineTree(myFPtree, myHeaderTab, minSup, set([]), freqItems)
+    return freqItems
+之前的loadSimpDat()函数返回了一组简单的样例数据，没有相同的事务，所以createInitSet()函数中直接赋值“retDict[frozenset(trans)] = 1”没有问题。但是如果要封装成一个通用的FP-growth算法，就还需要处理输入数据有相同事务的情形，createInitSet()函数中需要累加retDict[frozenset(trans)]。
+
+
+
