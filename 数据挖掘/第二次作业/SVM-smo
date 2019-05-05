@@ -46,42 +46,61 @@ def clipAlpha(aj,H,L):
 #            同时优化这两个向量
 #            如果两个向量都不能被优化，退出内循环
 #    如果所有向量都没被优化，增加迭代数目，继续下一次循环
+
+
+//将多个列表和输入参数转换成NumPy矩阵（为了简化数学处理操作）
+转置类别标签，从而得到一个列向量而非列表
+从而：类别标签向量的每行元素都和数据矩阵中的行一一对应
+通过矩阵dataMatIn的shape属性得到常数m，n
+---->构建一个alpha列矩阵，所有元素初始化为0，并建一个iter变量存储没有任何alpha改变的情况下的遍历数据集的次数。当变量达到输入值maxIter时，结束运行并退出。
+
+//数据集，类别标签，常数C，容错率和退出前最大的循环次数
 def smoSimple(dataMatIn,classLabels,C,toler,maxIter):
     dataMatrix = mat(dataMatIn);labelMat = mat(classLabels).transpose()
     b = 0; m,n = shape(dataMatrix)
     alphas = mat(zeros((m,1)))
     iter = 0
     while(iter < maxIter):
-        alphaPairsChanged = 0
+        alphaPairsChanged = 0  //记录alpha是否已经进行优化，初始化0
         for i in range(m):
             fXi = float(multiply(alphas,labelMat).T*\
-                        (dataMatrix*dataMatrix[i,:].T))+b
-            Ei = fXi - float(labelMat[i])
-            if((labelMat[i]*Ei < -toler) and (alphas[i]<C)) or\
-               ((labelMat[i]*Ei>toler) and (alphas[i]>0)):
-                   j = selectJrand(i,m)
+                        (dataMatrix*dataMatrix[i,:].T))+b  //预测的类别
+            Ei = fXi - float(labelMat[i])    //误差
+            //同时也要检查alpha值，保证其不能等于0或C
+            //后面的alpha<0或>C时将被调整为0或C，一旦等于，相当于其
+            //处于边界，因而不能够再减小或增大，不值得再优化它们
+            if((labelMat[i]*Ei < -toler) and (alphas[i]<C)) or\  //正间隔和负间隔
+               ((labelMat[i]*Ei>toler) and (alphas[i]>0)):  //如果误差很大，优化
+                   j = selectJrand(i,m)    //随机选择第二个alpha，调用上面
                    fXj = float(multiply(alphas,labelMat).T*\
                                (dataMatrix*dataMatrix[j,:].T))+b
-                   Ej = fXj - float(labelMat[j])
+                   Ej = fXj - float(labelMat[j])  //误差
                    alphaIold = alphas[i].copy();
                    alphaJold = alphas[j].copy();
-                   if(labelMat[i] != labelMat[j]):
+                   if(labelMat[i] != labelMat[j]):  //将alpha调整在（0，C）
                        L = max(0,alphas[j] - alphas[i])
                        H = min(C,C +alphas[j]-alphas[i])
                    else:
                        L = max(0,alphas[j] + alphas[i]-C)
                        H = min(C,alphas[j] + alphas[i])
-                   if L == H: print("L==H");continue
+                   if L == H: print("L==H");continue  //相等则不变
+                   //continue->本次循环结束直接运行下一次for循环
+                   //eta是alpha[j]的最优修改量
                    eta = 2.0 * dataMatrix[i,:] * dataMatrix[j,:].T - \
                         dataMatrix[i,:] * dataMatrix[i,:].T - \
                         dataMatrix[j,:] * dataMatrix[j,:].T 
+                   //若eta=0，需退出for循环当前迭代过程（这里简化）
+                   //不然rta=0，新alpha[j]计算太麻烦。所以忽略
                    if eta >= 0:print("eta>=0");continue
                    alphas[j] -= labelMat[j] * (Ei - Ej)/eta
                    alphas[j] = clipAlpha(alphas[j],H,L)
+                   //检查alpha[j]是否有轻微改变，有则退出for循环
+                   //并对alpha[i]和alpha[j]同样进行改变，改变方向相反
                    if(abs(alphas[j] - alphaJold) < 0.00001):
                        print("j not moving enough");continue
                    alphas[i] += labelMat[j] * labelMat[i]*\
                            (alphaJold - alphas[j])
+                    //对alpha[i][j]进行优化后，给这两个alpha值设一个常数//项
                     b1 = b - Ei - labelMat[i]*(alphas[i]-alphaIold)*\
                          dataMatrix[i,:]*dataMatrix[i,:].T - \
                          labelMat[j]*(alphas[j]-alphaJold)*\
@@ -96,7 +115,11 @@ def smoSimple(dataMatIn,classLabels,C,toler,maxIter):
                     alphaPairsChanged += 1
                     print("iter: %d i:%d,pairs changed %d") %\
                           (iter,i,alphaPairsChanged)
-             if(alphaPairsChanged == 0): iter += 1
-             else: iter=0
-             print("iteration number: %d") % iter
+          //for循环外，检查alpha值是否做了更新，有更新则将iter设为
+          //0，后继续运行程序
+           if(alphaPairsChanged == 0): iter += 1
+           else: iter=0
+           print("iteration number: %d") % iter
+//在所有数据集上遍历maxIter次，且不再发生任何alpha修改之后，
+//程序结束并退出while循环
     return b,alphas
