@@ -1,0 +1,14 @@
+关于备忘录的升级版。应用fragment，可绕开Android系统activity使用规则的限制
+
+整体：P106
+       crimefragment-->创建管理用户界面，以及与模型对象交互。
+       三个类：Crime,CrimeFragment,CrimeActivity
+       Crime:某种陋习（标题，标识id，一个日期&一个布尔值）-->存放在CrimeFragment类的成员变量（mCrime）中。
+       CrimeFragment：由一个LinearLayout组件及其三个子视图（ExitText,button,ChectBox）组成。存储成员变量，设监听器，响应用户操作并更新模型层数据。
+       CrimeActivity：FrameLayout为其视图安排位置
+
+6.11 
+   先开发应用的记录明细部分。
+   fragmrnt管理用户界面，activity托管fragment实例
+   （fragment本身无在屏幕上显示视图的能力，故将其视图放置在activity视图层级结构中，fragment视图才能显示在屏幕上。
+   第八章
